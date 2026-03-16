@@ -5,18 +5,16 @@ import argparse
 import json
 import os
 import subprocess
+import sys
 import time
 from datetime import datetime
 from pathlib import Path
 
 
-PROJECT = Path("/home/zongze/mengshichen_projects")
-DATASET_ROOT = Path("/home/mengshi/table_quality/datasets_joint_discovery_integration")
-TOOLS = PROJECT / "dataset_tools"
-STARMIE = PROJECT / "starmie_baseline"
+STARMIE = Path(__file__).resolve().parent
 LOCAL_CONVERT = STARMIE / "convert_1218_unionable_to_starmie_uts.py"
 LOCAL_EVAL = STARMIE / "eval_starmie_uts_threshold.py"
-PY_STARMIE = Path("/home/zongze/.venvs/starmie/bin/python")
+DEFAULT_DATASET_ROOT = os.environ.get("STARMIE_DATASET_ROOT", "").strip()
 
 DATASETS = {
     "wikidbs_1218": "wikidbs_1218",
@@ -86,11 +84,22 @@ def parse_args() -> argparse.Namespace:
         default=list(DATASETS.keys()),
         choices=list(DATASETS.keys()),
     )
-    parser.add_argument("--dataset-root", type=Path, default=DATASET_ROOT)
+    parser.add_argument(
+        "--dataset-root",
+        type=Path,
+        default=Path(DEFAULT_DATASET_ROOT) if DEFAULT_DATASET_ROOT else None,
+        help="Root containing *_1218 datasets. Can also be set by STARMIE_DATASET_ROOT.",
+    )
     parser.add_argument(
         "--output-root",
         type=Path,
         default=STARMIE / "runs" / "uts_1218_full",
+    )
+    parser.add_argument(
+        "--python-bin",
+        type=Path,
+        default=Path(os.environ.get("STARMIE_PYTHON", sys.executable)),
+        help="Python executable used to run sub-commands (default: current interpreter).",
     )
     parser.add_argument("--gpu", default="1")
     parser.add_argument("--n-epochs", type=int, default=3)
@@ -108,6 +117,10 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+    if args.dataset_root is None:
+        raise ValueError(
+            "Missing dataset root. Pass --dataset-root or set STARMIE_DATASET_ROOT."
+        )
     args.output_root.mkdir(parents=True, exist_ok=True)
     logs_dir = args.output_root / "logs"
     logs_dir.mkdir(parents=True, exist_ok=True)
@@ -131,7 +144,7 @@ def main() -> None:
         nvsmi_out, _ = run_cmd(["nvidia-smi"], ds_name, log_path, env=base_env)
 
         conv_cmd = [
-            str(PY_STARMIE),
+            str(args.python_bin),
             str(LOCAL_CONVERT),
             "--dataset-root",
             str(ds_root),
@@ -153,7 +166,7 @@ def main() -> None:
         run_env["STARMIE_DATA_ROOT"] = str(run_root)
 
         pretrain_cmd = [
-            str(PY_STARMIE),
+            str(args.python_bin),
             "run_pretrain.py",
             "--task",
             "santos",
@@ -186,7 +199,7 @@ def main() -> None:
         _, pretrain_sec = run_cmd(pretrain_cmd, ds_name, log_path, cwd=STARMIE, env=run_env)
 
         extract_cmd = [
-            str(PY_STARMIE),
+            str(args.python_bin),
             "extractVectors.py",
             "--benchmark",
             "santos",
@@ -201,7 +214,7 @@ def main() -> None:
 
         vec_dir = run_root / "santos" / "vectors"
         eval_cmd = [
-            str(PY_STARMIE),
+            str(args.python_bin),
             str(LOCAL_EVAL),
             "--query-pkl",
             str(vec_dir / f"cl_query_{args.augment_op}_{args.sample_meth}_{args.table_order}_{run_id}.pkl"),

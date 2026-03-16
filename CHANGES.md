@@ -32,3 +32,11 @@
   - Made eval vector file names follow selected `augment/sample/table_order` instead of fixed `drop_col/tfidf_entity/column`.
   - Added local `convert_1218_unionable_to_starmie_uts.py` under `starmie_baseline` and switched `run_starmie_0316.py` to use this local converter (removes external `dataset_tools` converter dependency).
   - Added local `eval_starmie_uts_threshold.py` under `starmie_baseline` and switched `run_starmie_0316.py` to use this local evaluator (removes external `dataset_tools` evaluator dependency).
+  - Improved runner portability in `run_starmie_0316.py`:
+    - removed hardcoded `/home/zongze/...` paths.
+    - default project root resolves from script location.
+    - dataset root can be passed by `--dataset-root` or env `STARMIE_DATASET_ROOT`.
+    - python interpreter can be overridden via `--python-bin` or env `STARMIE_PYTHON` (default: current interpreter).
+  - Added shell entrypoint `run_starmie_0316.sh`:
+    - self-locates repo root (`SCRIPT_DIR`) and supports env overrides (GPU, PYTHON_BIN, DATASET_ROOT, DATASETS, etc.).
+    - provides `--help`, unified logging, and `/usr/bin/time -v` runtime stats.
